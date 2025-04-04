@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual Webcam View</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        .webcam-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        video {
+            width: 400px;
+            height: 300px;
+            border: 1px solid #ccc;
+            background-color: #000;
+        }
+        #error-message{
+            color: red;
+            margin-top: 10px;
+        }
+        .webcam-square {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Dual Webcam View</h1>
+
+    <div class="webcam-container">
+        <div id="webcam1-container" class="webcam-square">
+                <video id="webcam1" autoplay playsinline></video>
+                <label for="deviceSelect1">Select Webcam 1:</label>
+                <select id="deviceSelect1"></select>
+        </div>
+        <div id="webcam2-container" class="webcam-square">
+            <video id="webcam2" autoplay playsinline></video>
+            <label for="deviceSelect2">Select Webcam 2:</label>
+            <select id="deviceSelect2"></select>
+        </div>
+    </div>
+    <div id="error-message"></div>
+
+    <script>
+        async function getWebcamStream(deviceId) {
+            try {
+                const constraints = {
+                    audio: false,
+                    video: {
+                        deviceId: deviceId ? { exact: deviceId } : undefined,
+                    },
+                };
+                return await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (error) {
+                console.error("Error accessing webcam:", error);
+                throw error;
+            }
+        }
+
+        function setVideoStream(videoElement, stream) {
+            videoElement.srcObject = stream;
+        }
+
+        async function startWebcams() {
+            try {
+                //ask for permission to access the webcam
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                //stop the stream immediately to avoid showing it in the first webcam
+                stream.getTracks().forEach(track => track.stop());
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                if (videoDevices.length < 2) {
+                    document.getElementById("error-message").textContent = "At least two webcams are required.";
+                    return;
+                }
+
+                const webcam1 = document.getElementById("webcam1");
+                const webcam2 = document.getElementById("webcam2");
+
+                //show the devices available to the user in a dropdown
+                const deviceSelect1 = document.getElementById("deviceSelect1");
+                videoDevices.forEach(device => {
+                    const option = document.createElement("option");
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Webcam ${device.deviceId}`;
+                    deviceSelect1.appendChild(option);
+                });
+                deviceSelect1.addEventListener("change", async () => {
+                    const selectedDeviceId = deviceSelect1.value;
+                    const selectedStream = await getWebcamStream(selectedDeviceId);
+                    setVideoStream(webcam1, selectedStream);
+                });
+
+                //show the devices available to the user in a dropdown
+                const deviceSelect2 = document.getElementById("deviceSelect2");
+                videoDevices.forEach(device => {
+                    const option = document.createElement("option");
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Webcam ${device.deviceId}`;
+                    deviceSelect2.appendChild(option);
+                });
+                deviceSelect2.addEventListener("change", async () => {
+                    const selectedDeviceId = deviceSelect2.value;
+                    const selectedStream = await getWebcamStream(selectedDeviceId);
+                    setVideoStream(webcam2, selectedStream);
+                });
+
+                //start the webcams
+                const selectedDeviceId1 = deviceSelect1.value;
+                const selectedDeviceId2 = deviceSelect2.value;
+                const stream1 = await getWebcamStream(selectedDeviceId1);
+                setVideoStream(webcam1, stream1);
+                const stream2 = await getWebcamStream(selectedDeviceId2);
+                setVideoStream(webcam2, stream2);
+                
+                //stop the streams when the user closes the page
+                window.addEventListener("beforeunload", () => {
+                    stream1.getTracks().forEach(track => track.stop());
+                    stream2.getTracks().forEach(track => track.stop());
+                });
+            } catch (error) {
+                document.getElementById("error-message").textContent = "Error accessing webcams. Please check permissions and try again.";
+                console.error("Error starting webcams:", error);
+            }
+        }
+
+        startWebcams();
+    </script>
+
+</body>
+</html>
